@@ -5,7 +5,7 @@
 # Compiler settings - Can be customized.
 CC = gfortran
 CPP = gfortran -cpp
-CXXFLAGS = -g -O0 -Wall
+CXXFLAGS = -g -O0 -Wall # -J mod
 LDFLAGS = 
 
 # Makefile settings - Can be customized.
@@ -39,7 +39,7 @@ $(APPNAME): $(OBJ)
 	$(RM) *.d *.mod
 
 # Creates the dependecy rules
-%.d: $(SRCDIR)/%$(EXT)
+%.d: $(SRCDIR)/%$(EXT) mod/
 	@$(CPP) $(CFLAGS) $< -MM -MT $(@:%.d=$(OBJDIR)/%.o) >$@
 
 # Includes all .h files
