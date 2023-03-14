@@ -4,69 +4,74 @@
 
 # Compiler settings - Can be customized.
 CC = gfortran
-CPP = gfortran -cpp
-CXXFLAGS = -g -O0 -Wall
+DEBUG_FLAGS= -g -O0 -J obj -Wall -fcheck=all
+FFLAGS?=${DEBUG_FLAGS}
 LDFLAGS = 
 
 # Makefile settings - Can be customized.
-APPNAME = myapp
+UNITY_TESTS?= Unity_tests
+MODULAR_TESTS?= Modular_tests
+UNITY_TESTS_APP_NAME?= Unity_tests_debug
+MODULAR_TESTS_APP_NAME?= Modular_tests_debug
 EXT = .F90
 SRCDIR = src
+TESTDIR = test
 OBJDIR = obj
 
 ############## Do not change anything from here downwards! #############
-SRC = $(wildcard $(SRCDIR)/*$(EXT))
-OBJ = $(SRC:$(SRCDIR)/%$(EXT)=$(OBJDIR)/%.o)
-DEP = $(OBJ:$(OBJDIR)/%.o=%.d)
-MOD = $(OBJ:$(OBJDIR)/%.o=%.mod)
-# UNIX-based OS variables & settings
-RM = rm
-DELOBJ = $(OBJ)
-# Windows OS variables & settings
-DEL = del
-EXE = .exe
-WDELOBJ = $(SRC:$(SRCDIR)/%$(EXT)=$(OBJDIR)\\%.o)
+SRC = $(wildcard $(SRCDIR)/*/*$(EXT))
 
+OBJ = $(SRC:$(SRCDIR)/%$(EXT)=$(OBJDIR)/%.o)
+
+MOD = *.mod
+OBJTEST = $(TEST:$(TESTDIR)/%$(EXT)=$(TESTDIR)/%.o)
+
+UNITY_TESTS_APP = ${OBJDIR}/test/${UNITY_TESTS_APP_NAME}
+MODULAR_TESTS_APP = ${OBJDIR}/test/${MODULAR_TESTS_APP_NAME}
+
+RM = rm -rf
 ########################################################################
 ####################### Targets beginning here #########################
 ########################################################################
 
-all: $(APPNAME)
+all: $(UNITY_TESTS_APP) $(MODULAR_TESTS_APP)
 
-# Builds the app
-$(APPNAME): $(OBJ)
-	$(CC) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
-	$(RM) *.d *.mod
+# Builds the app Unity Tests
+$(UNITY_TESTS_APP): ${TESTDIR}/${UNITY_TESTS}$(EXT) $(OBJ_TEST) $(OBJDIR)/model/moddata.o $(OBJDIR)/controller/modlist.o $(OBJDIR)/controller/modvector.o
+	@mkdir -p $(OBJDIR)/test
+	$(CC) $(FFLAGS) -o ${UNITY_TESTS_APP} $^ $(LDFLAGS)
 
-# Creates the dependecy rules
-%.d: $(SRCDIR)/%$(EXT)
-	@$(CPP) $(CFLAGS) $< -MM -MT $(@:%.d=$(OBJDIR)/%.o) >$@
+# Builds the app Modular Tests
+$(MODULAR_TESTS_APP): ${TESTDIR}/${MODULAR_TESTS}$(EXT)  $(OBJ_TEST) $(OBJDIR)/model/moddata.o $(OBJDIR)/controller/modlist.o $(OBJDIR)/controller/modvector.o
+	$(CC) $(FFLAGS) -o ${MODULAR_TESTS_APP} $^ $(LDFLAGS)
 
-# Includes all .h files
--include $(DEP)
+$(OBJDIR)/model/moddata.o: $(SRCDIR)/model/moddata.F90
+	@mkdir -p $(OBJDIR)/model
+	$(CC) $(FFLAGS) -o $@ -c $<
 
-# Building rule for .o files and its .c/.cpp in combination with all .h
-$(OBJDIR)/%.o: $(SRCDIR)/%$(EXT)
-	$(CC) $(CXXFLAGS) -o $@ -c $<
 
+$(OBJDIR)/controller/modlist.o: $(SRCDIR)/controller/modlist.F90 $(OBJDIR)/model/moddata.o
+	@mkdir -p $(OBJDIR)/controller
+	$(CC) $(FFLAGS) -o $@ -c $<
+
+
+$(OBJDIR)/controller/modvector.o: $(SRCDIR)/controller/modvector.F90 $(OBJDIR)/model/moddata.o
+	@mkdir -p $(OBJDIR)/controller
+	$(CC) $(FFLAGS) -o $@ -c $<
+
+	
 ################### Cleaning rules for Unix-based OS ###################
 # Cleans complete project
 .PHONY: clean
+
 clean:
-	$(RM) $(DELOBJ) $(DEP) $(APPNAME) *.mod
+	$(RM) $(OBJ) $(OBJTEST) $(MOD) ${MODULAR_TESTS_APP} ${UNITY_TESTS_APP}
 
-# Cleans only all files with the extension .d
-.PHONY: cleandep
-cleandep:
-	$(RM) $(DEP)
+run: runUnityTest runModularTest
 
-#################### Cleaning rules for Windows OS #####################
-# Cleans complete project
-.PHONY: cleanw
-cleanw:
-	$(DEL) $(WDELOBJ) $(DEP) $(APPNAME)$(EXE)
+runUnityTest:
+	(cd test && ./run_tests_with_type_of_param.sh ${UNITY_TESTS_APP_NAME})
 
-# Cleans only all files with the extension .d
-.PHONY: cleandepw
-cleandepw:
-	$(DEL) $(DEP)
+runModularTest:
+	(cd test && ./run_tests_with_type_of_param.sh ${MODULAR_TESTS_APP_NAME})
+
